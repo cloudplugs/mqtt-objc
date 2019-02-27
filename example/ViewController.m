@@ -1,0 +1,232 @@
+/*
+ Copyright 2019 CloudPlugs Inc.
+ 
+ Licensed to the Apache Software Foundation (ASF) under one
+ or more contributor license agreements.  See the NOTICE file
+ distributed with this work for additional information
+ regarding copyright ownership.  The ASF licenses this file
+ to you under the Apache License, Version 2.0 (the
+ "License"); you may not use this file except in compliance
+ with the License.  You may obtain a copy of the License at
+ 
+ http://www.apache.org/licenses/LICENSE-2.0
+ 
+ Unless required by applicable law or agreed to in writing,
+ software distributed under the License is distributed on an
+ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ KIND, either express or implied.  See the License for the
+ specific language governing permissions and limitations
+ under the License.
+*/
+
+#import "ViewController.h"
+
+#define PLUGID          @"dev-XXXXXXXX"
+#define PASSWORD        @"XXXXXXX"
+#define CLIENDID        @"X"
+#define HWID            @"X"
+#define IDMODEL         @"mod-XXXXXXX"
+#define PASSWORD_ENROLL @"XXXXXXX"
+
+@interface ViewController ()
+@end
+
+@implementation ViewController
+
+@synthesize CPMqttClient;
+
+-(void)subscribeMe {
+  
+  [CPMqttClient subscribeTo:@"topic"
+           subscribeHandler:^(NSError *error, NSArray<NSNumber *> *gQoss) {
+             if(error) {
+               NSLog(@"couldn't subscribe: %@", error.localizedDescription);
+             } else {
+               NSLog(@"subscription was successful");
+             }
+           }];
+}
+
+-(void)publish {
+  
+  [CPMqttClient publish:self.publishField.text
+                onTopic:@"topic"
+            withHandler:^(NSError *error) {
+              if (error) {
+                
+              } else {
+                
+              }
+            }];
+}
+
+-(void)publishWithTtl {
+  [CPMqttClient publish:self.publishField.text
+                onTopic:@"topic"
+                    ttl:100
+            withHandler:^(NSError *error) {
+              if (error) {
+                
+              } else {
+                
+              }
+            }];
+}
+
+-(void)publishWithPlugId {
+  [CPMqttClient publish:self.publishField.text
+                onTopic:@"topic"
+                     of:@"plugid"
+            withHandler:^(NSError *error) {
+              if (error) {
+                
+              } else {
+                
+              }
+            }];
+}
+
+-(void)publishWithTtlAndPlugId {
+  
+  [CPMqttClient publish:self.publishField.text
+                onTopic:@"topic"
+                    ttl:100
+                     of:self.CPMqttClient.plugId
+            withHandler:^(NSError *error) {
+              if (error) {
+                
+              } else {
+                
+              }
+            }];
+}
+
+-(IBAction)publishClicked:(id)sender {
+  
+  [self publish];
+}
+
+-(IBAction)enrollClicked:(id)sender {
+  
+  CPMqttClient = [[CloudPlugsMqttClient alloc] init];
+  
+  [CPMqttClient enroll:HWID
+               idModel:IDMODEL
+              password:PASSWORD_ENROLL
+           withHandler:^(NSError *error, NSString* msg) {
+             if(error) {
+               NSLog(@"enroll connection failed");
+             } else {
+               NSError* localError = nil;
+               NSData* data = [msg dataUsingEncoding:NSUTF8StringEncoding];
+               NSDictionary* dataDict = [NSJSONSerialization JSONObjectWithData:data
+                                                                        options:0
+                                                                          error:&localError];
+               
+               NSString* username=[dataDict objectForKey:@"id"];
+               NSString* auth=[dataDict objectForKey:@"auth"];
+               
+               NSLog(@"enroll connection succeded: %@", msg);
+               self.usernameField.text = username;
+               self.passwordField.text = auth;
+               
+               [self.messagesView setText:msg];
+             }
+           }];
+}
+-(void)getProperty {
+  
+  NSString* propToGet = @"pro1";
+  
+  [self.CPMqttClient getProperty:@"pro1" withHandler:^(NSError *error, NSString *value) {
+    if (error) {
+      NSLog(@"get property failed");
+    } else {
+      NSLog(@"%@->%@", propToGet, value);
+    }
+  }];
+}
+
+-(void)setProperty {
+  
+  [self.CPMqttClient setProperty:@"pro1" value:@"ciao" withHandler:^(NSError *error) {
+  }];
+}
+
+-(void)connect {
+  
+  CPMqttClient = [[CloudPlugsMqttClient alloc] init];
+  
+  [CPMqttClient setUsername:self.usernameField.text
+                   password:self.passwordField.text
+                   clientId:self.serialField.text];
+  
+  CPMqttClient.CPDelegate = self;
+  CPMqttClient.tls = YES;
+  [CPMqttClient connectWithHandler:^(NSError *error) {
+    if (error) {
+      NSLog(@"connection failed");
+    } else {
+      NSLog(@"connection ok");
+      [self subscribeMe];
+      [self setProperty];
+      [self getProperty];
+      [self testPersistence];
+    }
+  }];
+}
+
+-(IBAction)connect:(id)sender {
+  
+  [self connect];
+}
+
+-(void)viewDidLoad {
+  
+  [super viewDidLoad];
+  self.serialIdEnrollField.text = HWID;
+  self.templateIdField.text = IDMODEL;
+  self.passwordEnrollField.text = PASSWORD_ENROLL;
+  
+  self.usernameField.text = PLUGID;
+  self.passwordField.text = PASSWORD;
+  self.serialField.text = HWID;
+  self.hostField.text = DEFAULT_URL;
+  self.portField.text = [@(DEFAULT_PORT) stringValue];
+}
+
+-(void)didReceiveMemoryWarning {
+  [super didReceiveMemoryWarning];
+}
+
+-(void)mqttMessageDidArrive:(NSData *)data onTopic:(NSString *)topic retained:(BOOL)retained {
+  
+  NSString* message = [NSString stringWithUTF8String:[data bytes]];
+  NSLog(@"message arrived: %@", message);
+  [self.messagesView setText:message];
+}
+
+-(void)sendSomeData {
+  
+  static int idx = 0;
+  NSString* msg = [NSString stringWithFormat:@"msg:%d", idx++];
+  [CPMqttClient publish:msg
+                onTopic:@"topic"
+            withHandler:^(NSError *error) {
+              if(error) {
+                NSLog(@"publish error: %@", error.localizedDescription);
+              } else {
+                NSLog(@"publish was successful");
+              }
+            }];
+}
+
+-(void)testPersistence {
+  [NSTimer scheduledTimerWithTimeInterval:1.0
+                                   target:self
+                                 selector:@selector(sendSomeData)
+                                 userInfo:nil
+                                  repeats:YES];
+}
+
+@end

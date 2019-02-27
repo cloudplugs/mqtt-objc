@@ -1,0 +1,10 @@
+# Ignore the build and lib dirs
+
+## User settings
+xcuserdata/
+
+# Ignore any executables
+
+# Ignore Mac specific files
+.DS_Store
+

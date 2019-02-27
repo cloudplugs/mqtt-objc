@@ -1,0 +1,6 @@
+framework module Pods_CloudPlugsMqttClient {
+  umbrella header "Pods-CloudPlugsMqttClient-umbrella.h"
+
+  export *
+  module * { export * }
+}
